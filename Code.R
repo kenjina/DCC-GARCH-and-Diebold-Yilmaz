@@ -97,13 +97,7 @@ pre = subset(clean, Date >= start1 & Date <= end1)    # Periode sebelum covid
 during = subset(clean, Date >= start2 & Date <= end2) # Periode selama COVID-19
 clean = subset(clean, Date <= end2)
 
-#write.csv(pre, file = "pre.csv", row.names = FALSE)
-#write.csv(during, file = "during.csv", row.names = FALSE)
-
-#View(pre)
-#View(during)
-
-#Check skewness and kurtosis setiap periode
+#Check skewness and kurtosis setiap periode sebagai statistik deskriptif
 summary(pre)
 sd(pre$STI)
 skewness(pre)
@@ -114,16 +108,9 @@ sd(during$KLSE)
 skewness(during)
 kurtosis(during)
 
-nrow(pre)
-nrow(during)
-
-#skewness(clean)
-#kurtosis(clean)
-
 # Uji normalitas untuk setiap periode
-# Data log return tidak usah normal distributed, standardized residual harus multivariate normal
 
-data_frames <- list(pre = pre, during = during, clean = clean)
+data_frames <- list(pre = pre, during = during)
 columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
 
 jbtest <- data.frame(Column = columns)
@@ -167,7 +154,6 @@ for (df_name in names(data_frames)) {
 }
 
 print(adf) # Semua stasioner
-
 
 #################################################################################
 
@@ -290,11 +276,11 @@ for (lag in 1:22) {
 archduring_noar <- pivot_wider(arch22, names_from = Lag, values_from = P_Value)
 archduring_noar
 
-archpre_noar # Semua ada ARCH effect, JKSE paling jauh di lag 17
+archpre_noar # Semua ada ARCH effect
 archduring_noar # Semua ada ARCH effect
 
-# Pemilihan model GARCH terbaik ############
-data_frame <- pre  # Change this to pre and during
+# Pemilihan model GARCH terbaik untuk periode sebelum covid
+data_frame <- pre
 columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
 garch_orders <- c(1, 2)
 arch_orders <- c(1, 2)
@@ -343,10 +329,61 @@ for (col in columns) {
 }
 # SIC adalah shibata
 garchpre = results_df
-garchpre      
+garchpre
+
+# Pemilihan ordo garch terbaik untuk periode covid-19
+data_frame <- during
+columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
+garch_orders <- c(1, 2)
+arch_orders <- c(1, 2)
+
+results_df <- data.frame(
+  Stock = character(0),
+  GARCH_Order = numeric(0),
+  ARCH_Order = numeric(0),
+  AIC = numeric(0),
+  BIC = numeric(0),
+  SIC = numeric(0),
+  HQIC = numeric(0),
+  Likelihood = numeric(0)
+)
+
+for (col in columns) {
+  for (garch_order in garch_orders) {
+    for (arch_order in arch_orders) {
+      # Define the GARCH model specification
+      model <- ugarchspec(
+        mean.model = list(armaOrder = c(0, 0)),
+        variance.model = list(garchOrder = c(garch_order, arch_order), model = "sGARCH"),
+        distribution.model = "sstd"
+      )
+      
+      # Fit the GARCH model
+      garch_fit <- ugarchfit(model, data = data_frame[[col]])
+      
+      # Extract AIC and BIC values
+      aic_bic <- infocriteria(garch_fit)
+      lkh <- likelihood(garch_fit)
+      
+      # Store the results in the data frame
+      results_df <- rbind(results_df, data.frame(
+        Stock = col,
+        GARCH_Order = garch_order,
+        ARCH_Order = arch_order,
+        AIC = infocriteria(garch_fit)[1],
+        BIC = infocriteria(garch_fit)[2],
+        SIC = infocriteria(garch_fit)[3],
+        HQIC = infocriteria(garch_fit)[4],
+        Likelihood = lkh
+      ))
+    }
+  }
+}
+# SIC adalah shibata
+garchduring = results_df
 garchduring
 
-# DCC Test untuk setiap periode
+# DCC Test untuk setiap periode untuk menguji korelasi konstan
 
 dcctestpre <- data.frame(
   n_lag = integer(),
@@ -398,7 +435,7 @@ for (n_lag in 1:22) {
 # Print the resulting data frame
 print(dcctestdur)
 
-dcctestpre # Korelasi tidak konstan untuk lag 11 sampai sekian
+dcctestpre # Korelasi tidak konstan untuk lag 11 sampai 16
 dcctestdur # Korelasi tidak konstan untuk lag 3 sampai 22
 
 # DCC-GARCH
@@ -1071,11 +1108,12 @@ wilcox.test(cor_sgmy1, cor_sgmy2, alternative = "two.sided")$p.value
 
 
 ######################################################################################
+
 # Pendekatan Diebold Yilmaz
 # Pemilihan model VAR terbaik untuk setiap periode
 
 VARselect(pre[,-1])     # p = 1
-VARselect(during[,-1])  # AIC = 10, HQ = 2, BIC = 1, FPEP = 10, p = 10
+VARselect(during[,-1])  # AIC = 10, HQ = 2, BIC = 1, FPE = 10, p = 10
 
 varpre = vars::VAR(pre[,-1], p = 1)
 print(varpre)
@@ -1133,30 +1171,9 @@ static_during = ConnectednessApproach(duringzoo,
                                    Connectedness_config=list(TimeConnectedness=list(generalized=TRUE))) # Generalized sesuai DY 2012
 static_during$TABLE
 
-# Plotting NPDC gabungan 2 periode
-dca_whole = abind(dca_pre$NPDC, dca_during$NPDC, along = 3)
-tail(dca_whole)
-
-# JKSE-SET
-plot(dca_whole[2,1,], type = "l", ylim = c(-10,10))
-abline(h=0)
-polygon(c(dca_whole[2,1,], rev(dca_whole[2,1,])), c(dca_whole[2,1,], rep(0, length(dca_whole[2,1,]))), col = "black", border = NA)
-rect(par("usr")[1], par("usr")[3], par("usr")[2], 0, col = "black", border = NA, density = 1000)
-
-
 # Diagnosis model VAR
 varpre = vars::VAR(pre[,-1], p = 1)
 vardur = vars::VAR(during[,-1], p = 10)
-
-# Testing tabel baru
-varpre2 = ConnectednessApproach::VAR(prezoo, configuration = list(nlag = 1))
-vardur2 = ConnectednessApproach::VAR(duringzoo, configuration = list(nlag = 10))
-
-fevdpre = FEVD(Phi = varpre2$B, Sigma = varpre2$Q, nfore = 10, type = "time", generalized = TRUE) # Same thing
-fevdduring = FEVD(Phi = vardur2$B, Sigma = vardur2$Q, nfore = 10, type = "time", generalized = TRUE) # Same thing
-fevdpre$FEVD # Same thing
-fevdduring$FEVD # Same thing
-
 
 # Pengujian residual
 resvarpre = data.frame(residuals(varpre))
@@ -1366,138 +1383,3 @@ STI_KLSE_1 = dca_pre$NPDC[5,4,]
 STI_KLSE_2 = dca_during$NPDC[5,4,]
 wilcox.test(STI_KLSE_1, STI_KLSE_2)
 wilcox.test(STI_KLSE_1, STI_KLSE_2)$p.value # Beda
-
-
-##################################################################
-
-# Ngetest ngitung CCC sendiri
-# MUNGKIN INI CARA PAKE CCC wiley
-resid1 = residuals(ufitid1)
-resph1 = residuals(ufitph1)
-resth1 = residuals(ufitth1)
-resmy1 = residuals(ufitmy1)
-ressg1 = residuals(ufitsg1)
-res1 = data.frame(JKSE = resid1, SET = resth1, PSEI = resph1, STI = ressg1, KLSE = resmy1)
-cor(res1)
-correlation1[,,1]
-
-ufitid2 = ugarchfit(specid2, data = during$JKSE)
-ufitph2 = ugarchfit(specph2, data = during$PSEI)
-ufitth2 = ugarchfit(specth2, data = during$SET)
-ufitmy2 = ugarchfit(specmy2, data = during$KLSE)
-ufitsg2 = ugarchfit(specsg2, data = during$STI)
-
-ufitid1 = ugarchfit(specid1, data = pre$JKSE)
-ufitph1 = ugarchfit(specph1, data = pre$PSEI)
-ufitth1 = ugarchfit(specth1, data = pre$SET)
-ufitmy1 = ugarchfit(specmy1, data = pre$KLSE)
-ufitsg1 = ugarchfit(specsg1, data = pre$STI)
-
-resid2 = residuals(ufitid2)
-resph2 = residuals(ufitph2)
-resth2 = residuals(ufitth2)
-resmy2 = residuals(ufitmy2)
-ressg2 = residuals(ufitsg2)
-res2 = data.frame(JKSE = resid2, SET = resth2, PSEI = resph2, STI = ressg2, KLSE = resmy2)
-cor(res2)
-correlation2[,,1]
-
-# Mungkin ini CCC pakai Copula GARCH (Normal) berdasarkan package rmgarch
-cccspec1 = cgarchspec(uspec=multispec(speclist1), dccOrder = c(1,1), distribution.model= list(copula="mvnorm"))
-cccfit1 = cgarchfit(cccspec1, data = pre[,-1])
-cccfit1
-modelfit1
-correlation1 # DCC Matrix
-rcor(cccfit1) # CCC Matrix pakai package
-
-specid2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specph2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specth2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specmy2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specsg2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-
-speclist2 = list(specid2, specth2, specph2, specsg2, specmy2)
-modelspec2 = dccspec(uspec=multispec(speclist2), dccOrder = c(1,1), distribution = "mvt")
-modelfit2 = dccfit(modelspec2, data = during[,-1])
-modelfit2
-
-cccspec2 = cgarchspec(uspec=multispec(speclist2), dccOrder = c(1,1), distribution.model = list(copula="mvnorm"))
-cccfit2 = cgarchfit(cccspec2, data = during[,-1])
-cccfit2
-modelfit2
-rcor(cccfit2) # beda banget korelasi nya
-correlation2
-
-# Kalau bandingin nilai kriteria, menang CCC
-
-# Testing
-
-dca_during = ConnectednessApproach(duringzoo,
-                                   nlag = 10, # lag
-                                   nfore = 10, #n.ahead
-                                   window.size = 300, # biar plot nya ga cuma 1 observasi
-                                   model = "VAR",
-                                   connectedness = "Time",
-                                   Connectedness_config=list(TimeConnectedness=list(generalized=TRUE))) # Generalized sesuai DY 2012
-dca_during$TABLE
-PlotNPDC(dca_during)
-
-testdy = VAR(duringzoo, configuration = list(nlag=10))
-testdcady = TimeConnectedness(testdy$B, testdy$Q, nfore = 10)
-testdcady$TABLE # Beda karena masalah window size
-
-data(dy2012)
-
-fit = VAR(dy2012, configuration=list(nlag=4))
-dca1= TimeConnectedness(fit$B, fit$Q, nfore=10)
-dca1$TABLE
-
-dca2 = ConnectednessApproach(dy2012,
-                            nlag=4,
-                            nfore=10,
-                            model="VAR",
-                            corrected=FALSE,
-                            window.size=NULL,
-                            connectedness="Time",
-                            Connectedness_config = list(
-                              TimeConnectedness=list(generalized=TRUE)))
-dca2$TABLE
-plotNPDC(dca2)
-
-dca3 = ConnectednessApproach(dy2012,
-                             nlag=4,
-                             nfore=10,
-                             model="VAR",
-                             corrected=FALSE,
-                             window.size=100,
-                             connectedness="Time",
-                             Connectedness_config = list(
-                               TimeConnectedness=list(generalized=TRUE)))
-dca3$TABLE
-
-count(dy2012)
-###########################################################
-
-# Testing CCC-GARCH pakai package ccgarch
-# Sepertinya tidak bisa
-ufitid2 = ugarchfit(specid2, data = during$JKSE)
-ufitph2 = ugarchfit(specph2, data = during$PSEI)
-ufitth2 = ugarchfit(specth2, data = during$SET)
-ufitmy2 = ugarchfit(specmy2, data = during$KLSE)
-ufitsg2 = ugarchfit(specsg2, data = during$STI)
-
-ufitid1 = ugarchfit(specid1, data = pre$JKSE)
-ufitph1 = ugarchfit(specph1, data = pre$PSEI)
-ufitth1 = ugarchfit(specth1, data = pre$SET)
-ufitmy1 = ugarchfit(specmy1, data = pre$KLSE)
-ufitsg1 = ugarchfit(specsg1, data = pre$STI)
-
-ufitid1 # constant = 0,000362
-ufitth1 # c = 0,000210
-ufitph1 # c = 0,000193
-ufitsg1 # c = 0,000289
-ufitmy1 # c = -0,000066
-
-a = c(0.000362, 0.000210, 0.000193, 0.000289, -0.000066)
-a
-eccc.estimation()
