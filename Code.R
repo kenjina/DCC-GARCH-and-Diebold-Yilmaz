@@ -440,11 +440,11 @@ dcctestdur # Korelasi tidak konstan untuk lag 3 sampai 22
 
 # DCC-GARCH
 # pre
-specid1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd") #,mean.model = list(armaOrder = c(1,0), include.mean = TRUE))
-specph1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specth1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specmy1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specsg1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
+specid1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specph1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specth1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specmy1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specsg1 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
 
 speclist1 = list(specid1, specth1, specph1, specsg1, specmy1)
 modelspec1 = dccspec(uspec=multispec(speclist1), dccOrder = c(1,1), distribution = "mvt")
@@ -452,11 +452,11 @@ modelfit1 = dccfit(modelspec1, data = pre[,-1])
 modelfit1 # dapat alpha dan beta dimana alpha + beta < 1
 
 # during
-specid2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specph2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specth2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specmy2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
-specsg2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd")
+specid2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specph2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specth2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specmy2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
+specsg2 <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)), distribution.model = "sstd", mean.model = list(armaOrder = c(0,0)))
 
 speclist2 = list(specid2, specth2, specph2, specsg2, specmy2)
 modelspec2 = dccspec(uspec=multispec(speclist2), dccOrder = c(1,1), distribution = "mvt")
@@ -479,6 +479,8 @@ rcor(cccfit2)
 # Uji validitas model DCC-GARCH, pakai standardized residual atau squared standardized residual
 stdres1 = as.data.frame(modelfit1@mfit$stdresid)
 stdres2 = as.data.frame(modelfit2@mfit$stdresid)
+
+par(mfrow = c(1,1))
 
 plot(pre$Date, stdres1[,1],type = "l")
 plot(pre$Date, stdres1[,2],type = "l")
@@ -546,8 +548,8 @@ for (lag in 1:22) {
 lbpre_res2 <- pivot_wider(ljungpreres2, names_from = Lag, values_from = P_Value) # Biar jadi table
 lbpre_res2
 
-lbpre_res1 # standardized residual dcc pre, semuanya tidak ada autokorelasi
-lbpre_res2 # during, KLSE ada autokorelasi lag 12 sampe 13, 18 sampe 22
+lbpre_res1
+lbpre_res2 # 
 
 archres1 <- data.frame(
   Lag = integer(),
@@ -660,61 +662,6 @@ lbpre_sqres2
 
 lbpre_sqres1 # sq standardized residual dcc, PSEI dan KLSE ada autokorelasi di lag 1
 lbpre_sqres2 # STI ada autokorelasi pada lag 15 sampe 20
-
-archsqres1 <- data.frame(
-  Lag = integer(),
-  Column = character(),
-  P_Value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
-
-for (lag in 1:22) {
-  for (col in columns) {
-    arch_test_result <- ArchTest(sqres1[[col]], lag = lag)
-    p_value <- arch_test_result$p.value
-    
-    result_row <- data.frame(
-      Lag = lag,
-      Column = col,
-      P_Value = p_value
-    )
-    archsqres1 <- rbind(archsqres1, result_row)
-  }
-}
-
-archpre_sqres <- pivot_wider(archsqres1, names_from = Lag, values_from = P_Value)
-archpre_sqres
-
-archsqres2 <- data.frame(
-  Lag = integer(),
-  Column = character(),
-  P_Value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
-
-for (lag in 1:22) {
-  for (col in columns) {
-    arch_test_result <- ArchTest(sqres2[[col]], lag = lag)
-    p_value <- arch_test_result$p.value
-    
-    result_row <- data.frame(
-      Lag = lag,
-      Column = col,
-      P_Value = p_value
-    )
-    archsqres2 <- rbind(archsqres2, result_row)
-  }
-}
-
-archdur_sqres <- pivot_wider(archsqres2, names_from = Lag, values_from = P_Value)
-archdur_sqres
-
-archpre_sqres # squared standardized residual dcc, PSEI ada arch effect di lag 1 sampai 2 
-archdur_sqres # PSEI (lag 5 sampe 22) dan STI (lag 15 sampe 22) ada arch effect
 
 # Residual dari model CCC-GARCH
 cccres1 = as.data.frame(cccfit1@mfit$stdresid)
@@ -900,62 +847,6 @@ lb_sqcccres2
 
 lb_sqcccres1 # standardized sq residual ccc pre, ada autokorelasi untuk PSEI (lag 1) dan KLSE (lag 1 dan 2)
 lb_sqcccres2 # during, ada autokorelasi untuk STI dari lag 15 sampe 20
-
-archsqcccres1 <- data.frame(
-  Lag = integer(),
-  Column = character(),
-  P_Value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
-
-for (lag in 1:22) {
-  for (col in columns) {
-    arch_test_result <- ArchTest(sqcccres1[[col]], lag = lag)
-    p_value <- arch_test_result$p.value
-    
-    result_row <- data.frame(
-      Lag = lag,
-      Column = col,
-      P_Value = p_value
-    )
-    archsqcccres1 <- rbind(archsqcccres1, result_row)
-  }
-}
-
-archpre_sqcccres <- pivot_wider(archsqcccres1, names_from = Lag, values_from = P_Value)
-archpre_sqcccres
-
-archsqcccres2 <- data.frame(
-  Lag = integer(),
-  Column = character(),
-  P_Value = numeric(),
-  stringsAsFactors = FALSE
-)
-
-columns <- c("JKSE", "SET", "PSEI", "STI", "KLSE")
-
-for (lag in 1:22) {
-  for (col in columns) {
-    arch_test_result <- ArchTest(sqcccres2[[col]], lag = lag)
-    p_value <- arch_test_result$p.value
-    
-    result_row <- data.frame(
-      Lag = lag,
-      Column = col,
-      P_Value = p_value
-    )
-    archsqcccres2 <- rbind(archsqcccres2, result_row)
-  }
-}
-
-archdur_sqcccres <- pivot_wider(archsqcccres2, names_from = Lag, values_from = P_Value)
-archdur_sqcccres
-
-archpre_sqcccres # sq standardized residual ccc pre, PSEI ada ARCH effect di  lag 1 sampe 2 dan lag 6
-archdur_sqcccres # during, PSEI (lag 5 sampe 22)dan STI (lag 15 sampe 22) ada ARCH effect
-
 
 # Estimasi matriks korelasi dinamis
 correlation1 = rcor(modelfit1) # Dari data pre
